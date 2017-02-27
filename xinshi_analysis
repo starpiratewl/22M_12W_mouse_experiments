@@ -2,6 +2,7 @@ library("meshr")
 library(mygene)
 library("fdrtool") 
 library("MeSH.Mmu.eg.db")
+library(biomaRt)
 
 setwd("D:\\importantbk\\working\\lab_working\\sequencing\\BC160712\\1.mRNA+circRNA\\2_gene_expression_analysis\\2_3_differential_gene")
 
@@ -16,94 +17,110 @@ down_list <- unique(mydata_down$gene.name)
 up_list <- unique(mydata_up$gene.name)
 
 
-## use mygene package
-haha <- queryMany(down_list, scopes="symbol", fields=c("id"), species="mouse", returnall = T)
 
-## get the mygene result as a dataframe
-result <- cbind(haha$response[,1],as.character(haha$response[,2]),haha$response[,3],haha$response[,4])
-colnames(result) <- c("notfound","query","id","X_score")
-result <- as.data.frame(result)
-result$query <- as.character(result$query)
+getgeneids <- function(x){
+  ## use mygene package
+  haha <- queryMany(get(paste(x, "_list", sep = "")), scopes="symbol", fields=c("id"), species="mouse", returnall = T)
 
-
-## use biomaRt
-library(biomaRt)
-
-## define biomart object
-## 1,biomart have changed a lot in the past few months. first we need add host="www.ensembl.org here to indicate the host site.
-## 2,listMarts(host = "www.ensembl.org") can tell us the name of the database, we choose the "ENSEMBL_MART_ENSEMBL" here.
-
-mart <- useMart("ENSEMBL_MART_ENSEMBL", dataset = "mmusculus_gene_ensembl", host="www.ensembl.org")
-
-down_tab <- getBM(attributes = c("entrezgene","external_gene_name"),filters = "external_gene_name", down_list, mart = mart)
-
-## get the result from biomaRt and mygene together, some result in biomaRt but some in mygene, so we have to combine them
-overall <- merge(result, down_tab, all = T, by.x = "query", by.y = "external_gene_name")
-
-overall$notfound <- as.numeric(overall$notfound)
-
-## some gene can not be found in both biomaRt and mygene so we get rid of them
-overall[!is.na(overall$notfound) & is.na(overall$entrezgene) == T, ]
-index_filter <- as.numeric(row.names(overall[!is.na(overall$notfound) & is.na(overall$entrezgene) == T, ]))
-overall_filter <- overall[-eval(index_filter),]
-
-##combine the results, all the genes have a gene id from biomaRt or mygene calculation
-overall_filter$final <- overall_filter$id
-overall_filter$notfound[is.na(overall_filter$notfound)]  = 0
-overall_filter$final <- as.character(overall_filter$final)
-overall_filter$entrezgene <- as.numeric(overall_filter$entrezgene)
+  ## get the mygene result as a dataframe
+  result <- cbind(haha$response[,1],as.character(haha$response[,2]),haha$response[,3],haha$response[,4])
+  colnames(result) <- c("notfound","query","id","X_score")
+##  colnames(result) <- c("id","X_score","query","notfound")
+  result <- as.data.frame(result)
+  result$query <- as.character(result$query)
 
 
-for(i in 1:length(overall_filter$id)){
-  if(overall_filter$notfound[i] == 1){
-    overall_filter$final[i] = overall_filter$entrezgene[i]
+  ## use biomaRt
+  ## define biomart object
+  ## 1,biomart have changed a lot in the past few months. first we need add host="www.ensembl.org here to indicate the host site.
+  ## 2,listMarts(host = "www.ensembl.org") can tell us the name of the database, we choose the "ENSEMBL_MART_ENSEMBL" here.
+
+  mart <- useMart("ENSEMBL_MART_ENSEMBL", dataset = "mmusculus_gene_ensembl", host="www.ensembl.org")
+
+  need_tab <- getBM(attributes = c("entrezgene","external_gene_name"),filters = "external_gene_name", get(paste(x, "_list", sep = "")), mart = mart)
+
+  ## get the result from biomaRt and mygene together, some result in biomaRt but some in mygene, so we have to combine them
+  overall <- merge(result, need_tab, all = T, by.x = "query", by.y = "external_gene_name")
+
+  overall$notfound <- as.numeric(overall$notfound)
+
+  ## some gene can not be found in both biomaRt and mygene so we get rid of them
+  overall[!is.na(overall$notfound) & is.na(overall$entrezgene) == T, ]
+  index_filter <- as.numeric(row.names(overall[!is.na(overall$notfound) & is.na(overall$entrezgene) == T, ]))
+  overall_filter <- overall[-eval(index_filter),]
+
+  ##combine the results, all the genes have a gene id from biomaRt or mygene calculation
+  overall_filter$final <- overall_filter$id
+  overall_filter$notfound[is.na(overall_filter$notfound)]  = 0
+  overall_filter$final <- as.character(overall_filter$final)
+  overall_filter$entrezgene <- as.numeric(overall_filter$entrezgene)
+
+
+  for(i in 1:length(overall_filter$id)){
+    if(overall_filter$notfound[i] == 1){
+      overall_filter$final[i] = overall_filter$entrezgene[i]
+    }
   }
+
+  overall_next <- overall_filter[,c(1,6)]
+
+  ## some genes have more than one id in the result, we have to find them
+  dup_genes <- names(table(overall_next$query)[table(overall_next$query) >= 2])
+  overall_next[overall_next$query %in% dup_genes, ]
+
+  ## the duplication of genes and ids have tow cases, first just duplication, second gene-id and gene-ENSMUSGxxxxxxxx
+  ## we should eliminate both kinds of duplication
+  ## in the first case, it can be easily done by unique() function
+  overall_next_f1 <- unique(overall_next)
+
+  ## this step is to testify if the case 1 duplication have been removed
+  dup_genes <- names(table(overall_next_f1$query)[table(overall_next_f1$query) >= 2])
+  temp_tab <- overall_next_f1[overall_next_f1$query %in% dup_genes, ]
+
+
+  ## in the second case, we want to abandon the gene-ENSMUSGxxxxxxxx record and keep the gene-id record
+  temp_seq <- as.numeric(row.names(temp_tab[nchar(temp_tab$final) > 11,]))
+  ##temp_seq
+  ##[1]   1   3   5   9  11  13  15  17  19  22  27  30  32  35  37  38  41  43  45  47  52  54  69  70  91  95  98 100 102 108 110 111 114 115 156 163 170 178 196 197 200 201 203 208 209 212 214 215 221
+  ##[50] 222 225 228 230 232 234 237 241 243 245 249 254 256 258 266 269 279 324 328 331 362 383 389 397 402 411 412 438 453 484 518 520 528 529 552
+
+  ##pay attention here , the temp row index numbers can not be used to filter the dataset, because they are not the right row index number, they inherit the number from former bigger dataset and when put into our filtered dataset, it represent the totally differect records, so we choose the method as follows:
+  overall_next_f2 <- overall_next_f1[row.names(overall_next_f1) %in% setdiff(as.numeric(row.names(overall_next_f1)), temp_seq),]
+
+
+  ##but here we still have the gene id with ENSMUSGxxxxxxxx, but it is much more clean than before.
+  ##now we try to deal with this left ENSMUSGxxxxxxxx
+  ##according to ncbi, most of the ENSMUSGxxxxxxxx result actually don't really have a gene name or gene id, so this part of genes can not be covered in the analysis, we just record it to see if it can be used in the future.
+  overall_next_left1 <- overall_next_f2[nchar(overall_next_f2$final) >= 17,]
+  overall_next_left2 <- overall_next_f2[nchar(overall_next_f2$final) <= 17,]
+  overall_next_left1$source <- rep(paste(x, "_ENSMYSGxx", sep = ""), length(overall_next_left1$final)) 
+  overall_next_left2$source <- rep(paste(x, "_geneid", sep = ""), length(overall_next_left2$final))
+  write.table(overall_next_left1, file = paste(x, "_ENSMYSGxx.txt", sep = ""), row.names = F, col.names = T, quote = F, sep = "\t")
+  write.table(overall_next_left2, file = paste(x, "_geneid.txt", sep = ""), row.names = F, col.names = T, quote = F,sep = "\t")
+  assign(paste(x, "_geneids", sep = ""), overall_next_left2$final， envir = .GlobalEnv)
 }
 
-overall_next <- overall_filter[,c(1,6)]
 
-## some genes have more than one id in the result, we have to find them
-dup_genes <- names(table(overall_next$query)[table(overall_next$query) >= 2])
-overall_next[overall_next$query %in% dup_genes, ]
-
-## the duplication of genes and ids have tow cases, first just duplication, second gene-id and gene-ENSMUSGxxxxxxxx
-## we should eliminate both kinds of duplication
-## in the first case, it can be easily done by unique() function
-overall_next_f1 <- unique(overall_next)
-
-## this step is to testify if the case 1 duplication have been removed
-dup_genes <- names(table(overall_next_f1$query)[table(overall_next_f1$query) >= 2])
-temp_tab <- overall_next_f1[overall_next_f1$query %in% dup_genes, ]
-
-
-## in the second case, we want to abandon the gene-ENSMUSGxxxxxxxx record and keep the gene-id record
-temp_seq <- as.numeric(row.names(temp_tab[nchar(temp_tab$final) > 11,]))
-##temp_seq
-##[1]   1   3   5   9  11  13  15  17  19  22  27  30  32  35  37  38  41  43  45  47  52  54  69  70  91  95  98 100 102 108 110 111 114 115 156 163 170 178 196 197 200 201 203 208 209 212 214 215 221
-##[50] 222 225 228 230 232 234 237 241 243 245 249 254 256 258 266 269 279 324 328 331 362 383 389 397 402 411 412 438 453 484 518 520 528 529 552
-
-##pay attention here , the temp row index numbers can not be used to filter the dataset, because they are not the right row index number, they inherit the number from former bigger dataset and when put into our filtered dataset, it represent the totally differect records, so we choose the method as follows:
-overall_next_f2 <- overall_next_f1[row.names(overall_next_f1) %in% setdiff(as.numeric(row.names(overall_next_f1)), temp_seq),]
-
-
-##but here we still have the gene id with ENSMUSGxxxxxxxx, but it is much more clean than before.
-##now we try to deal with this left ENSMUSGxxxxxxxx
-##
-
-
-##allgeneid <- read.csv(file = "DE_genelist_id_all.txt", sep = "\t", header = F, stringsAsFactor = F)$V1
-##siggeneid <- read.csv(file = "DE_genelist_id_sig.txt", sep = "\t", header = F, stringsAsFactor = F)$V1
+all_geneid_list <- all_geneids[!is.na(all_geneids)]
+up_geneid_list <- up_geneids[!is.na(up_geneids)]
+down_geneid_list <- down_geneids[!is.na(down_geneids)]
+sig_geneid_list <- union(up_geneid_list, down_geneid_list)
 
 
 
 
 
+
+
+##################################
+## chunk of analysis
+##################################
 
 # like topGO, it need to construct a MeSHHyperGParams object to specify all the parameters when do enrichment.
 meshParams <- new("MeSHHyperGParams", #
-                  geneIds = siggeneid, #
-                  universeGeneIds = allgeneid, #
-                  annotation = "MeSH.Hsa.eg.db", #
+                  geneIds = sig_geneid_list, #
+                  universeGeneIds = all_geneid_list, #
+                  annotation = "MeSH.Mmu.eg.db", #
                   category = "C", # like the classification of BP,MF,CC in GO
                   database = "gene2pubmed", #can be gendoo, gene2pubmed or RBBH
                   pvalueCutoff = 0.05, #
@@ -128,9 +145,16 @@ head(summary(meshR))
 ##15779 D009361 0.0002619206  3.942771 11.32673    21   33 Neoplasm Invasiveness   7306     <NA>
 
 
-result <- summary(meshR)[summary(meshR)$GENEID %in% siggeneid,]
+result <- summary(meshR)[summary(meshR)$GENEID %in% sig_geneid_list,]
 
-write.table(result, file = "MESH_result.txt",quote = F, row.names = F, col.names = T, sep = "\t")
+all_tab <- read.csv(file = "all_geneid.txt", sep = "\t", stringsAsFactor = F)
+
+haharesult <- merge(result, all_tab, by.x = "GENEID", by.y = "final", all = F)
+
+
+write.table(haharesult[,-11], file = "MESH_result.txt",quote = F, row.names = F, col.names = T, sep = "\t")
+
+
 
 save.abst(result)
 
@@ -141,50 +165,82 @@ save.abst(result)
 ## dealing with the mesh result
 ##################################
 
-setwd("D:\\importantbk\\learning\\meshr\\limma_test")
-
-result_tab <- read.csv(file = "MESH_result.txt", sep = "\t", stringsAsFactor = F)
 
 
-geneid <- result_tab$GENEID
-
-library(biomaRt)
-
-mart <- useMart("ENSEMBL_MART_ENSEMBL", dataset = "hsapiens_gene_ensembl", host="www.ensembl.org")
-
-##genesymbol <- getBM(attributes=c('hgnc_symbol'),filters = 'entrezgene', values = geneid,mart = mart)
-genesymbol <- geneid
-
-for (i in 1:length(geneid)){
-  genesymbol[i] <- getBM(attributes=c('hgnc_symbol'),filters = 'entrezgene', values = as.character(geneid[i]),mart = mart)$hgnc_symbol
-}
 
 ## view the overall distribution of pubmed papaers
-barplot(table(result_tab$MESHTERM))
+barplot(table(result$MESHTERM))
 
 ## view the distributions of MeSH terms containing over 100 pubmed papaers 
-over100 <- table(result_tab$MESHTERM)[table(result_tab$MESHTERM)>100]
+over100 <- table(result$MESHTERM)[table(result$MESHTERM)>100]
 
-barplot(over100, ylim = c(-600,1500),names.arg=F)
+pdf("diff_terms.pdf")
+par(pin = c(20,8),mar = c(1,5,1,1))  ## here mar can be set to modify bargin of the figure but can not to adjust the size
+posix <- barplot(over100, ylim = c(-3000,4500),names.arg=F, xlim= c(1,115))
+text(x = posix+0.5, y = -100, labels = names(over100),cex =1, srt = 90, pos = 2)
+dev.off()
 
-text(x = 1:length(over100), y = -200, labels = names(over100),cex =1, srt = 65)
+
+pdf("diff_terms1.pdf") 
+par(pin = c(10,8),mar = c(1,5,1,1)) ## here mar can be set to modify bargin of the figure but can not to adjust the size
+posix <- barplot(over100, ylim = c(-3000,4500),names.arg=F, xlim= c(1,115))
+text(x = posix+0.5, y = -100, labels = names(over100),cex =1, srt = 90, pos = 2)
+dev.off()
+
+
+pdf("diff_terms2.pdf", width = 14, height = 7) ## width and height can be set to modify the size of the fig
+par(mar = c(1,5,1,1))
+posix <- barplot(over100, ylim = c(-3000,4500),names.arg=F, xlim= c(1,115))
+text(x = posix+1, y = -100, labels = names(over100),cex =1, srt = 90, pos = 2)
+dev.off()
 
 
 ## view the terms by the means of pvalue
-test <- unique(result_tab[,c(1,2,3,4,5,6,7)])
+test <- unique(haharesult[,c(2,3,4,5,6,7,8)])
 
-test_20 <- head(test,20)
+test_20 <- head(test[order(test$Pvalue),],20)
 
-barplot(test_20$Pvalue,main="the most significant MeSH terms",xlab="P-value",horiz=TRUE,names=FALSE)
+par(pin = c(10,8),mar = c(5,15,4,2))
+y = barplot(test_20$Pvalue,main="the most significant MeSH terms",xlab="P-value",horiz=TRUE,names=FALSE)
 
-text(-0.00000000000000001,1:20,test_20$MESHTERM,cex=0.8,xpd=T,srt=0,pos=4)
-
-
-
+text(-0.00000000000000001,y,test_20$MESHTERM,cex=0.8,xpd=T,srt=0,pos=2)
 
 
 
 
 
+
+################################################
+## test 
+################################################
+testfunc <- function(x){
+  ## use mygene package
+  haha <- queryMany(get(paste(x, "_list", sep = "")), scopes="symbol", fields=c("id"), species="mouse", returnall = T)
+
+  ## get the mygene result as a dataframe
+  result <- cbind(haha$response[,1],as.character(haha$response[,2]),haha$response[,3],haha$response[,4])
+  colnames(result) <- c("id","X_score","query","notfound")
+  result <- as.data.frame(result)
+  result$query <- as.character(result$query)
+  return(result)
+}
+
+testfunc("down")
+
+##> head(result)
+##  notfound      query                 id   X_score
+##1     TRUE     mt-Nd4               <NA>      <NA>
+##2     <NA> Hist2h2aa1              15267  95.49406
+##3     <NA>      Cebpa              12606  79.15996
+##4     TRUE    mt-Atp8               <NA>      <NA>
+##5     <NA>    Gm42715 ENSMUSG00000107023  95.49097
+##6     <NA>    Gm21982 ENSMUSG00000094365 98.113655
+
+testfunc1 <- function(x){
+  for (i in eval(paste(x, "_list", sep = ""))){
+    print(i)
+  }
+}
+testfunc1("down")
 
 
