@@ -1,0 +1,43 @@
+setwd("D:\\importantbk\\working\\lab_working\\sequencing\\BC160712\\1.mRNA+circRNA\\4_lncRNA\\analysis")
+
+## up_list
+updata <- read.csv(file = "lncRNA_count.AMXB22M_vs_AMXB12W.edgeR_differential_UP.txt", sep = "\t", stringsAsFactor = F)
+up_list <- updata$lncRNA_id
+## down_list
+downdata <- read.csv(file = "lncRNA_count.AMXB22M_vs_AMXB12W.edgeR_differential_DOWN.txt", sep = "\t", stringsAsFactor = F)
+down_list <- downdata$lncRNA_id
+
+
+
+
+
+
+GO:0006082;
+
+
+library(org.Hs.eg.db)
+help("org.Hs.egGO2ALLEGS")
+e<-mget(cell.death.GO.terms,org.Hs.egGO2ALLEGS,ifnotfound=NA)
+e<-mget("GO:0006082",org.Hs.egGO2ALLEGS,ifnotfound=NA)
+t<-lapply(e,function(.ele,x){intersect(as.character(x),.ele)},genelist.entrez.id)
+
+
+library(AnnotationDbi)
+library(GO.db)
+xx <- as.list("GO:0006082","GO:0008369")
+if(length(xx) > 0){
+  # Get the TERMS for the first elent of xx
+  GOID(xx[[1]])
+  Term(xx[[1]])
+  Synonym(xx[[1]])
+  Secondary(xx[[1]])
+  Definition(xx[[1]])
+  Ontology(xx[[1]])
+}
+
+
+
+
+
+
+
