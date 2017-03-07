@@ -11,10 +11,6 @@ down_list <- downdata$lncRNA_id
 
 
 
-
-GO:0006082;
-
-
 library(org.Hs.eg.db)
 help("org.Hs.egGO2ALLEGS")
 e<-mget(cell.death.GO.terms,org.Hs.egGO2ALLEGS,ifnotfound=NA)
@@ -35,6 +31,31 @@ if(length(xx) > 0){
   Ontology(xx[[1]])
 }
 
+
+
+
+library(GO.db)
+
+goids <- c("GO:0003674","GO:0006810","GO:0001659","GO:0006629","GO:0006631","GO:0008152","GO:0019254","GO:0033539","GO:0042413")
+
+gocategory <- rep(NA, length(goids))
+
+goterms <- rep(NA, length(goids))
+
+gointerpretation <- rep(NA, length(goids))
+
+gotable <- data.frame(goids, gocategory, goterms, gointerpretation)
+gotable$goids <- as.character(gotable$goids)
+
+for (i in 1:dim(gotable)[1]){
+  gotable[i,2] <- GOTERM[[gotable[i,1]]]@Ontology
+  gotable[i,3] <- GOTERM[[gotable[i,1]]]@Term
+  gotable[i,4] <- GOTERM[[gotable[i,1]]]@Definition
+}
+
+
+
+library(Rcurl)
 
 
 
