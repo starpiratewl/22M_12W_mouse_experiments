@@ -55,10 +55,16 @@ for (i in 1:dim(gotable)[1]){
 
 
 
-library(Rcurl)
 
 
 
 
+library(RCurl)
+
+url <- c("http://www.noncode.org/show_rna.php?id=NONMMUT028177.2")
+
+getFormParams(query=url)
+
+tmp <- getForm(uri="http://www.noncode.org/show_rna.php?", id = "NONMMUT028177.2")
 
 
