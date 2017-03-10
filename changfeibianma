@@ -61,10 +61,33 @@ for (i in 1:dim(gotable)[1]){
 
 library(RCurl)
 
-url <- c("http://www.noncode.org/show_rna.php?id=NONMMUT028177.2")
+getlncgene <- function(x){
+##url <- c("http://www.noncode.org/show_rna.php?id=NONMMUT028177.2")
+##getFormParams(query=url)
+  tmp <- getForm(uri="http://www.noncode.org/show_rna.php?", id = x)
 
-getFormParams(query=url)
+  doc <- htmlParse(tmp)
 
-tmp <- getForm(uri="http://www.noncode.org/show_rna.php?", id = "NONMMUT028177.2")
+  nodetest <- getNodeSet(doc, "//table/table[@class = 'mPlist_infoB']")[[1]]
+
+  nodetbody <- getNodeSet(nodetest, "//tr/td/table/tbody")[[1]]
+
+  genepos <- getNodeSet(nodetbody, '//tbody/tr[2]')[[1]]
+
+  genesymbol <- getNodeSet(genepos,'//tr/td/a[@href]/text()')[[2]]
+  return(xmlValue(genesymbol))
+}
+
+lnclist <- c("NONMMUT033604.2","NONMMUT033611.2","NONMMUT037122.2","NONMMUT017931.2","NONMMUT105655.1","NONMMUT119739.1")
+
+
+genelist <- rep("haha", length(lnclist))
+changdu <- 1:length(lnclist)
+
+for(i in 1:length(lnclist)){
+  genelist[i] <- getlncgene(lnclist[i])
+  Sys.sleep(10)
+}
+
 
 
