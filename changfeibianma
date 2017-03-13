@@ -7,6 +7,88 @@ up_list <- updata$lncRNA_id
 downdata <- read.csv(file = "lncRNA_count.AMXB22M_vs_AMXB12W.edgeR_differential_DOWN.txt", sep = "\t", stringsAsFactor = F)
 down_list <- downdata$lncRNA_id
 
+test <- c("ENSMUST00000180670", "ENSMUST00000193261", "ENSMUST00000205571", "NONMMUT002657.2",  "NONMMUT006710.2",    "NONMMUT014402.2", "NONMMUT017282.2")
+
+
+library(RCurl)
+library(XML)
+
+getensembl <- function(x){
+  ##url <- "http://www.noncode.org/search.php?search_type=keyword&keyword=ENSMUST00000193393"
+  tmp <- getForm(uri = "http://www.noncode.org/search.php?", search_type = "keyword", keyword = x)
+  ##write.table(tmp, file = "haha.txt")
+  doc <- htmlParse(tmp)
+  nodetest <- getNodeSet(doc,"//div/div/div/div[@style = 'padding-top:5px']")[[1]]
+  nodebody <- getNodeSet(nodetest, "//div/table/table/tr[2]/td/table[@border = '0']/tr[2]/td[1]/a/text()")[[1]]
+  return(xmlValue(nodebody))
+}
+
+
+up_table <- cbind(ori_tag = up_list, ser_tag = up_list, gene_tag = rep(NA, length(up_list)))
+
+ensembl_index <- grep("ENSMUST", up_table[,1])
+
+for (i in ensembl_index){
+  up_table[i,2] <- getensembl(up_table[i,1])
+}
+
+
+noncode_index <- grep("NONMMUT", up_table[,2])
+
+for (i in noncode_index){
+  up_table[i,3] <- getlncgene(up_table[i,2])
+  Sys.sleep(10)
+}
+
+
+getlncgene <- function(x){
+##url <- c("http://www.noncode.org/show_rna.php?id=NONMMUT028177.2")
+##getFormParams(query=url)
+  tmp <- getForm(uri="http://www.noncode.org/show_rna.php?", id = x)
+
+  doc <- htmlParse(tmp)
+
+  nodetest <- getNodeSet(doc, "//table/table[@class = 'mPlist_infoB']")[[1]]
+
+  nodetbody <- getNodeSet(nodetest, "//tr/td/table/tbody")[[1]]
+
+  genepos <- getNodeSet(nodetbody, '//tbody/tr[2]')[[1]]
+
+  genesymbol <- getNodeSet(genepos,'//tr/td/a[@href]/text()')[[2]]
+  return(xmlValue(genesymbol))
+}
+
+
+
+
+
+
+
+
+
+
+lnclist <- c("NONMMUT033604.2","NONMMUT033611.2","NONMMUT037122.2","NONMMUT017931.2","NONMMUT105655.1","NONMMUT119739.1")
+
+
+genelist <- rep("haha", length(lnclist))
+changdu <- 1:length(lnclist)
+
+for(i in 1:length(lnclist)){
+  genelist[i] <- getlncgene(lnclist[i])
+  Sys.sleep(10)
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -55,39 +137,6 @@ for (i in 1:dim(gotable)[1]){
 
 
 
-
-
-
-
-library(RCurl)
-
-getlncgene <- function(x){
-##url <- c("http://www.noncode.org/show_rna.php?id=NONMMUT028177.2")
-##getFormParams(query=url)
-  tmp <- getForm(uri="http://www.noncode.org/show_rna.php?", id = x)
-
-  doc <- htmlParse(tmp)
-
-  nodetest <- getNodeSet(doc, "//table/table[@class = 'mPlist_infoB']")[[1]]
-
-  nodetbody <- getNodeSet(nodetest, "//tr/td/table/tbody")[[1]]
-
-  genepos <- getNodeSet(nodetbody, '//tbody/tr[2]')[[1]]
-
-  genesymbol <- getNodeSet(genepos,'//tr/td/a[@href]/text()')[[2]]
-  return(xmlValue(genesymbol))
-}
-
-lnclist <- c("NONMMUT033604.2","NONMMUT033611.2","NONMMUT037122.2","NONMMUT017931.2","NONMMUT105655.1","NONMMUT119739.1")
-
-
-genelist <- rep("haha", length(lnclist))
-changdu <- 1:length(lnclist)
-
-for(i in 1:length(lnclist)){
-  genelist[i] <- getlncgene(lnclist[i])
-  Sys.sleep(10)
-}
 
 
 
