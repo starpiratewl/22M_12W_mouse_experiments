@@ -37,7 +37,7 @@ noncode_index <- grep("NONMMUT", up_table[,2])
 
 for (i in noncode_index){
   up_table[i,3] <- getlncgene(up_table[i,2])
-  Sys.sleep(10)
+  Sys.sleep(1)
 }
 
 
