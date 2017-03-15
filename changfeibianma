@@ -73,6 +73,31 @@ up_table$short <- test
 
 
 
+up_table$GOs <- rep("GOO", dim(up_table)[1])
+
+
+for (i in 1:dim(up_table)[1]){
+  if(!is.na(up_table[i,4])){
+  s <- c("")
+  for (m in 1:length(grep(up_table[i,4], fun_table$V1))){
+    s <- paste(s, fun_table[grep(up_table[i,4], fun_table$V1)[m],2], sep = "")
+  }
+  up_table[i,5] <- s}else{
+  up_table[i,5] <- NA
+  }
+}
+
+
+write.table(up_table, file = "up_table_GOS.txt", sep = "\t", row.names = F, col.names = T, quote = F)
+
+
+
+
+
+
+
+
+
 
 
 
@@ -111,7 +136,19 @@ for(i in 1:length(lnclist)){
 
 
 
+
+
+
+
+
+
+
+
+
+
+
 library(org.Hs.eg.db)
+library(org.Mm.eg.db)
 help("org.Hs.egGO2ALLEGS")
 e<-mget(cell.death.GO.terms,org.Hs.egGO2ALLEGS,ifnotfound=NA)
 e<-mget("GO:0006082",org.Hs.egGO2ALLEGS,ifnotfound=NA)
