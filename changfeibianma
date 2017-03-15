@@ -103,7 +103,7 @@ for (i in 1:dim(up_table)[1]){
   if(!is.na(up_table[i,5])){
   s <- c("")
   for (m in 1:length(unlist(strsplit(up_table[i,5], ";")))){
-    s <- paste(s, GOTERM[[unlist(strsplit(up_table[i,5], ";"))[m]]]@Term, sep = "")
+    s <- paste(s, GOTERM[[unlist(strsplit(up_table[i,5], ";"))[m]]]@Term, sep = ";;;")
   }
   up_table[i,6] <- s}else{
   up_table[i,6] <- NA
@@ -111,7 +111,7 @@ for (i in 1:dim(up_table)[1]){
 }
 
 
-
+write.table(up_table, file = "up_table_Terms.txt", sep = "\t", row.names = F, col.names = T, quote = F)
 
 
 
@@ -119,7 +119,7 @@ for (i in 1:dim(up_table)[1]){
 ## function test of null GO terms
 #############################################
 
-xx <- c("GO:0006351;GO:0008150;GO:0006355;GO:0006468;GO:0032851;GO:0044267;GO:0051131;GO:0071300;GO:0060548")
+xx <- c("GO:0000046;GO:0006914")
 haha <- unlist(strsplit(xx, ";"))
 
 for (i in 1:length(haha)){
