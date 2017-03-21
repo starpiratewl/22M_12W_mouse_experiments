@@ -139,10 +139,27 @@ for (i in 1:length(haha)){
 
 
 
+#############################################
+## get sequence via biomaRt
+#############################################
+
+library(biomaRt)
+
+## define biomart object
+## 1,biomart have changed a lot in the past few months. first we need add host="www.ensembl.org here to indicate the host site.
+## 2,listMarts(host = "www.ensembl.org") can tell us the name of the database, we choose the "ENSEMBL_MART_ENSEMBL" here.
+
+mart <- useMart("ENSEMBL_MART_ENSEMBL", dataset = "hsapiens_gene_ensembl", host="www.ensembl.org")
+
+test1 <- getSequence(id = 673, type="entrezgene",seqType="gene_exon",upstream=100, mart=mart)
+
+write.table(test1, file = "haha.txt", sep = "\t", row.names = F, col.names = T, quote = F)
 
 
 
+test2 <- getSequence(id = 673, type="entrezgene",seqType="gene_exon", mart=mart)
 
+write.table(test2, file = "lala.txt", sep = "\t", row.names = F, col.names = T, quote = F)
 
 
 
