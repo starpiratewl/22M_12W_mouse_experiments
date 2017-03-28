@@ -139,9 +139,9 @@ for (i in 1:length(haha)){
 
 
 
-#############################################
-## get sequence via biomaRt
-#############################################
+###############################################################################################################
+## get lncsequence via biomaRt
+###############################################################################################################
 
 library(biomaRt)
 
@@ -149,7 +149,7 @@ library(biomaRt)
 ## 1,biomart have changed a lot in the past few months. first we need add host="www.ensembl.org here to indicate the host site.
 ## 2,listMarts(host = "www.ensembl.org") can tell us the name of the database, we choose the "ENSEMBL_MART_ENSEMBL" here.
 
-mart <- useMart("ENSEMBL_MART_ENSEMBL", dataset = "hsapiens_gene_ensembl", host="www.ensembl.org")
+mart <- useMart("ENSEMBL_MART_ENSEMBL", dataset = "mmusculus_gene_ensembl", host="www.ensembl.org")
 
 test1 <- getSequence(id = 673, type="entrezgene",seqType="gene_exon",upstream=100, mart=mart)
 
@@ -157,20 +157,74 @@ write.table(test1, file = "haha.txt", sep = "\t", row.names = F, col.names = T, 
 
 
 
-test2 <- getSequence(id = 673, type="entrezgene",seqType="gene_exon", mart=mart)
+test2 <- getSequence(id = "ENSMUST00000172812", type="ensembl_transcript_id",seqType="transcript_exon_intron", mart=mart)
 
 write.table(test2, file = "lala.txt", sep = "\t", row.names = F, col.names = T, quote = F)
 
 
 
 
+###############################################################################################################
+## get mirnasequence via files(downloaded from http://www.mirbase.org/ftp.shtml)
+###############################################################################################################
+##mirna_all <- read.csv(file = "mature.fa", sep = "\t", stringsAsFactor = F, header = F)
+
+library("Biostrings")
+
+mirna_all <- readRNAStringSet("mature.fa", format="fasta")
+
+dnamirna_all <- DNAStringSet(mirna_all)
+
+write.table(dnamirna_all, file = "dnamirna_all.txt", sep = "\t", col.names = T, row.names = F, quote = F)
 
 
+mDNA <- maskMotif(dnamirna_all[[2]], "CTA")
+
+mDNA
+##  22-letter "MaskedDNAString" instance (# for masking)
+##seq: ###TGCAATTTT###CCTTACC
+##masks:
+##  maskedwidth maskedratio active       desc
+##1           6   0.2727273   TRUE CTA-blocks
 
 
+as(mDNA, "Views")
+  Views on a 22-letter DNAString subject
+subject: CTATGCAATTTTCTACCTTACC
+views:
+    start end width
+[1]     4  12     9 [TGCAATTTT]
+[2]    16  22     7 [CCTTACC]
 
 
+mask(dnamirna_all[[2]], "CTA")
+##  Views on a 22-letter DNAString subject
+##subject: CTATGCAATTTTCTACCTTACC
+##views:
+##    start end width
+##[1]     4  12     9 [TGCAATTTT]
+##[2]    16  22     7 [CCTTACC]
 
+
+as(gaps(mDNA), "Views")
+##  Views on a 22-letter DNAString subject
+##subject: CTATGCAATTTTCTACCTTACC
+##views:
+##    start end width
+##[1]     1   3     3 [CTA]
+##[2]    13  15     3 [CTA]
+
+
+unmasked(mDNA)
+##  22-letter "DNAString" instance
+##seq: CTATGCAATTTTCTACCTTACC
+
+
+masks(mDNA)
+##MaskCollection of length 1 and width 22
+##masks:
+##  maskedwidth maskedratio active       desc
+##1           6   0.2727273   TRUE CTA-blocks
 
 
 
