@@ -175,7 +175,21 @@ mirna_all <- readRNAStringSet("mature.fa", format="fasta")
 
 dnamirna_all <- DNAStringSet(mirna_all)
 
+##This kind of output will only give the TCGA sequences
 write.table(dnamirna_all, file = "dnamirna_all.txt", sep = "\t", col.names = T, row.names = F, quote = F)
+
+
+##This kind of output will be fasta
+##writeXStringSet(dnamirna_all, file = "test.txt")
+
+
+##Actually I want the output like tables with one column indicate the sequence and another column indicate the mirna names
+##then I can 
+##but in the Biostrings package I don't find good resolution, in Biostrings Package I can only find the method to output the XStringSet object to fasta or fastq
+##at last I find that names()
+
+
+
 
 
 mDNA <- maskMotif(dnamirna_all[[2]], "CTA")
