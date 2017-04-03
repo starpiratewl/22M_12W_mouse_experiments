@@ -1,0 +1,239 @@
+source("https://bioconductor.org/biocLite.R")
+biocLite()
+biocLite("edgeR")
+
+##为了避免意外，我们开始一个全新的r session
+rm(list=ls())
+
+library(edgeR)
+
+load(url("http://qiubio.com:8080/bioconductor/RNA-seq/ds1.Rdata"))
+ls()
+
+class(counts)
+##[1] "matrix"
+
+dim(counts)
+##[1] 30727    27
+
+head(counts[, 1:7], 3)
+##                ES.07985 DE.07981 GT.66339 FG.08004 PE.07980 FE.66350 ES.66342
+##ENSG00000254468        0        0        0        1        0        0        1
+##ENSG00000177951       44       50       24       37       38       41      162
+##ENSG00000188076        0        0        0        0        0        0        0
+
+
+为载入的数据分组。这里使用列名提供的信息分组。
+grp <- as.factor(substr(colnames(counts), 1, 2)) ##substr截取列名的前两个字母
+table(grp)
+##grp
+##DE ES FE FG GT IS PE PH 
+## 3  3  4  3  3  2  6  3
+
+
+o <- order(grp)
+pairs(log2(1+counts[,o[1:7]]), pch=".",lower.panel=NULL) ##这个图给我们样品间关系的一揽印象
+
+
+建立一个DGEList对象，并对数据进行标准化(normalize)
+d <- DGEList(counts=counts, group=grp)
+d <- calcNormFactors(d)
+d$samples
+##         group lib.size norm.factors
+##ES.07985    ES   769440    0.9720613
+##DE.07981    DE   947798    1.0560409
+##GT.66339    GT   548227    0.8668307
+##FG.08004    FG   726088    1.2161278
+##PE.07980    PE   688903    1.0602042
+##FE.66350    FE   521573    1.1357497
+##ES.66342    ES  2281754    0.9035550
+##DE.66333    DE  2834208    0.9780780
+##GT.66341    GT  1596550    0.7662695
+##FG.66346    FG  2070020    1.1650270
+##PE.66344    PE  1978504    1.0384803
+##FE.66331    FE  1517276    1.0618221
+##PH.66332    PH   840380    1.3760235
+##PH.66336    PH   852548    1.3735312
+##PE.66345    PE   915042    1.2393702
+##PE.66330    PE   938173    1.2295965
+##FE.66348    FE   629687    1.1130709
+##FE.66334    FE   647313    1.1128918
+##ES.66335    ES  2048439    0.7027366
+##DE.66349    DE  1843746    0.7488982
+##GT.66337    GT  1761089    0.8635605
+##FG.66351    FG  1417106    0.9453883
+##PE.66338    PE  2317354    0.8958021
+##PH.66340    PH  4087566    1.1389491
+##PE.66329    PE  3700620    1.0792805
+##IS.66347    IS 12583285    0.5621091
+##IS.66343    IS 33286768    0.9297169
+
+
+##这里的norm.factors计算方法有3种，分别是TMM, RLE和upperquartile。默认使用TMM方法。
+
+##接下来要去除低表达值的数据，这一步可以减少很多计算量，不做也不影响最终的结果。
+dim(d)
+##[1] 30727    27
+
+
+cps <- cpm(d) ## count per million
+k <- rowSums(cps>=1) > 2
+d <- d[k,]
+dim(d)
+##[1] 21707    27
+
+
+##我们看到数据几乎减少了1/3。
+
+##然后进行聚类分析。这一步是质量控制的关键一步。如果同一组的biological replicates不 能相聚在一起，必要时需要考虑重新实验。如果条件允许，这一步就要抛弃一些意外的数据。
+
+cols <- as.numeric(d$samples$group)
+plotMDS(d,col=cols)
+
+##绘制multidimensional scaling plot有很多种手段。LFC就是log2 fold change, BCV就是 biological coefficient of variation. 为了快速绘图，默认情况下只是抽取了top 500个值。
+
+par(mfrow=c(2,2))
+plotMDS(d, col=cols, main="500 / lLFC")
+plotMDS(d, col=cols, method="bcv", main="500 / BCV")
+plotMDS(d, col=cols, top=2000, main="2000 / lLFC")
+plotMDS(d, col=cols, top=2000, method="bcv", main="2000 / BCV")
+
+
+
+##而后构建模型。
+mm <- model.matrix(~-1+grp)
+mm
+
+##   grpDE grpES grpFE grpFG grpGT grpIS grpPE grpPH
+##1      0     1     0     0     0     0     0     0
+##2      1     0     0     0     0     0     0     0
+##3      0     0     0     0     1     0     0     0
+##4      0     0     0     1     0     0     0     0
+##5      0     0     0     0     0     0     1     0
+##6      0     0     1     0     0     0     0     0
+##7      0     1     0     0     0     0     0     0
+##8      1     0     0     0     0     0     0     0
+##9      0     0     0     0     1     0     0     0
+##10     0     0     0     1     0     0     0     0
+##11     0     0     0     0     0     0     1     0
+##12     0     0     1     0     0     0     0     0
+##13     0     0     0     0     0     0     0     1
+##14     0     0     0     0     0     0     0     1
+##15     0     0     0     0     0     0     1     0
+##16     0     0     0     0     0     0     1     0
+##17     0     0     1     0     0     0     0     0
+##18     0     0     1     0     0     0     0     0
+##19     0     1     0     0     0     0     0     0
+##20     1     0     0     0     0     0     0     0
+##21     0     0     0     0     1     0     0     0
+##22     0     0     0     1     0     0     0     0
+##23     0     0     0     0     0     0     1     0
+##24     0     0     0     0     0     0     0     1
+##25     0     0     0     0     0     0     1     0
+##26     0     0     0     0     0     1     0     0
+##27     0     0     0     0     0     1     0     0
+##attr(,"assign")
+##[1] 1 1 1 1 1 1 1 1
+##attr(,"contrasts")
+##attr(,"contrasts")$grp
+##[1] "contr.treatment"
+
+##依据模型估算离散度（dispersion）。你一定会问什么是离散度啊？在McCarthy, DJ, Chen, Y, Smyth, GK (2012). Differential expression analysis of multifactor RNA-Seq experiments with respect to biological variation. Nucleic Acids Research 40, 4288-4297.一文中定义离散度为生物变异系数（biological coefficient of variation）的平方。这里需要解释一下什么是技术重复（technical replicates），什么是生物重复（biological replicates）。技术重复就是同样的一个生物样品，使用相同的操作技术，两次或者两次以上实验。而生物重复是指不同的生物样品，使用相同的操作技术，两次或者两次以上的实验。而 biological variation在上文中专指排除technical variation以外的因为不同生物样品导致的差异。 \(Total CV^2 = Technical CV^2 + Biological CV^2\)
+
+d <- estimateGLMCommonDisp(d,mm)
+d <- estimateGLMTrendedDisp(d,mm)
+
+
+## Loading required package: splines
+library(splines)
+
+d <- estimateGLMTagwiseDisp(d,mm)
+
+##其实离散度也可以是质量控制的一部分。我们使用plotBCV来察看同一组内不同样品的不同表达水平值的方差分析。
+plotBCV(d)
+
+##从上图中，可以看到红线所在的Common dispersion有0.34左右。但是当我们调用d$common.dispersion时，它却只有0.12。这是怎么回事呢？这是因为求方根之后才是真正的值。
+d$common.dispersion
+##[1] 0.1182326
+sqrt(d$common.dispersion)
+##[1] 0.3438496
+
+
+##请无视此段。对于BCV的估计，正常情况下，必须要有很多样品才能比较准确，而生物实验是不可能提供成百上千的重复的，所以通常的手段是将表达值相近的基因等同看待。但是这样还是会对BCV过度估计。对于过度估计，在GLM中可以penalized maximum likelihood estimation来进行修正。
+
+##对于plotBCV给出的红线，它在0.2~0.4之间都是容易接受的。但如果超过0.5，则需要考虑实验样品之间的差异是否过大了。
+
+plotMeanVar(d, show.raw=TRUE, show.tagwise=TRUE, show.binned=TRUE)
+
+##在上图中，很明显地显示出基因水平的差异（variance）随着表达值的升高而升高。这一点会让有些人觉得很困惑，因为很多人会认为当表达值升高时，变异系数应该下降才对。但其实随着表达值升高，变异系数下降只符合技术重复带来的差异变化，而生物重复带来的差异变化却并不是这样。从dispersion的图中我们可以看到，它是一个两头翘的分布。因为生物重复差异在整体的变异系数中占主导地位，所以我们会观察到其基因水平的变异系数反而会随着表达值的升高而升高。
+
+##对于基因芯片，我们熟悉了MAplot，对于RNAseq同样可以绘制MAplot。MAplot的y轴的中值应该在0线上。
+par(mfrow=c(1,2))
+plotSmear(d, pair=c("ES","DE"), ylim=c(-5,5))
+plotSmear(d, pair=c("DE","GT"), ylim=c(-5,5))
+
+##接下来的步骤就是统计分析的步骤了。先做广义线性拟合（Generalized linear models），而后构建比较结构（construct contrast），最后依据比较结构进行比较，给出差异表达的基因。
+
+f <- glmFit(d,mm)
+con <- makeContrasts("DE-ES"=grpDE-grpES,levels=colnames(mm))
+con
+##       Contrasts
+##Levels  DE-ES
+##  grpDE     1
+##  grpES    -1
+##  grpFE     0
+##  grpFG     0
+##  grpGT     0
+##  grpIS     0
+##  grpPE     0
+##  grpPH     0
+
+
+lrt <- glmLRT(f,contrast=con)
+topTags(lrt,20)
+
+##Coefficient:  1*grpDE -1*grpES 
+##                    logFC   logCPM       LR       PValue          FDR
+##ENSG00000095596  8.531965 6.645695 294.9352 4.180692e-66 9.075028e-62
+##ENSG00000076356  7.977710 7.286413 280.5513 5.694614e-63 6.180650e-59
+##ENSG00000164292 10.583205 6.429442 261.7985 6.958117e-59 5.034661e-55
+##ENSG00000185823  7.349110 5.670454 241.1688 2.186994e-54 1.186827e-50
+##ENSG00000125798  9.891217 8.036607 227.4613 2.133071e-51 9.260514e-48
+##ENSG00000132130 11.314265 6.383295 223.3868 1.650706e-50 5.971978e-47
+##ENSG00000126005 -4.501205 6.472783 217.7752 2.764963e-49 8.142791e-46
+##ENSG00000104332  4.707090 6.774748 217.6121 3.000983e-49 8.142791e-46
+##ENSG00000158815 14.931773 7.285605 202.9898 4.649639e-46 1.121441e-42
+##ENSG00000119242  6.266296 6.646431 198.7375 3.938523e-45 8.549352e-42
+##ENSG00000182798  5.061889 7.540024 184.9321 4.060797e-42 8.013430e-39
+##ENSG00000266283 11.070768 8.357647 181.4201 2.373379e-41 4.293245e-38
+##ENSG00000120875  7.806731 5.494034 177.9492 1.358966e-40 2.269159e-37
+##ENSG00000110799  7.638526 4.830357 177.4599 1.738011e-40 2.694786e-37
+##ENSG00000121966  7.529062 5.850640 174.5993 7.323317e-40 1.059782e-36
+##ENSG00000185155  6.431694 4.812000 172.0028 2.702392e-39 3.666302e-36
+##ENSG00000164736 12.848342 5.269058 171.2458 3.954343e-39 5.049231e-36
+##ENSG00000124942  6.854475 7.485133 170.6180 5.422359e-39 6.539063e-36
+##ENSG00000141448 13.186488 6.557458 166.0444 5.409592e-38 6.180317e-35
+##ENSG00000110148  6.790154 6.109903 162.2155 3.712061e-37 4.028885e-34
+
+
+
+##最后，得到差异表达基因列表后，我们找出几个来做一个检查，看看结果对不对。
+cps <- cpm(d)
+o <- order(colnames(counts))
+barplot( cps["ENSG00000095596",o], col=cols[o], las=2)
+
+##输出结果至文件。
+tt <- topTags(lrt, n=Inf)$table
+write.table(tt, file="LRT1.xls", row.names=FALSE, sep="\t", quote=FALSE)
+
+
+####################################
+## DESeq2 载入DESeq2
+####################################
+
+
+
+
+
+
+
