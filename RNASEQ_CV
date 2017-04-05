@@ -231,6 +231,163 @@ write.table(tt, file="LRT1.xls", row.names=FALSE, sep="\t", quote=FALSE)
 ## DESeq2 载入DESeq2
 ####################################
 
+library(DESeq2)
+
+load(url("/bioconductor/RNA-seq/ds1.Rdata"))
+ls()
+
+##  [1] "cols"   "con"    "counts" "cps"    "d"      "f"      "grp"   
+##  [8] "k"      "lrt"    "mm"     "o"      "tt"
+
+
+head(counts[, 1:7], 3)
+##                 ES.07985 DE.07981 GT.66339 FG.08004 PE.07980 FE.66350
+## ENSG00000254468        0        0        0        1        0        0
+## ENSG00000177951       44       50       24       37       38       41
+## ENSG00000188076        0        0        0        0        0        0
+##                 ES.66342
+## ENSG00000254468        1
+## ENSG00000177951      162
+## ENSG00000188076        0
+
+grp <- as.factor(substr(colnames(counts), 1, 2)) ##substr截取列名的前两个字母
+
+##这里的colData必须是一个DataFrame或者data.frame。每一行都对应着counts中的一列。design中的公式和limma中的方法一致。
+dds <- DESeqDataSetFromMatrix(counts, colData=data.frame(grp), design=formula(~-1+grp)) 
+design(dds)
+
+## ~-1 + grp
+
+dds <- DESeq(dds) ##一步到位，不需要太多步骤
+
+## estimating size factors
+## estimating dispersions
+## gene-wise dispersion estimates
+## mean-dispersion relationship
+## final dispersion estimates
+## fitting model and testing
+
+
+
+res <- results(dds) ##得到结果
+res
+## log2 fold change (MAP): grp PH vs DE 
+## Wald test p-value: grp PH vs DE 
+## DataFrame with 30727 rows and 6 columns
+##                  baseMean log2FoldChange     lfcSE       stat    pvalue
+##                 <numeric>      <numeric> <numeric>  <numeric> <numeric>
+## ENSG00000254468    0.4287       -1.05357    1.6490  -0.638900  0.522888
+## ENSG00000177951  101.9852        0.30692    0.2534   1.211289  0.225785
+## ENSG00000188076    0.1621       -0.01532    1.7535  -0.008735  0.993031
+## ENSG00000177947    2.6249       -2.84301    1.2344  -2.303244  0.021265
+## ENSG00000254559  496.3435       -0.93363    0.3140  -2.973341  0.002946
+## ...                   ...            ...       ...        ...       ...
+## ENSG00000248275  19.84377      1.595e+00    0.4163  3.830e+00 0.0001281
+## ENSG00000248103   0.01374      2.614e-05    0.8715  3.000e-05 0.9999761
+## ENSG00000238035 127.55955     -3.819e-01    0.2806 -1.361e+00 0.1736234
+## ENSG00000250765   1.86059     -4.989e-01    1.0464 -4.768e-01 0.6335268
+## ENSG00000230178   0.00751      5.954e-07    0.3614  1.648e-06 0.9999987
+##                      padj
+##                 <numeric>
+## ENSG00000254468        NA
+## ENSG00000177951   0.37016
+## ENSG00000188076        NA
+## ENSG00000177947   0.05871
+## ENSG00000254559   0.01137
+## ...                   ...
+## ENSG00000248275 0.0007656
+## ENSG00000248103        NA
+## ENSG00000238035 0.3038560
+## ENSG00000250765 0.7615653
+## ENSG00000230178        NA
+
+
+
+
+
+mcols(res, use.names=TRUE) ##结果中各例的意义
+
+## DataFrame with 6 rows and 2 columns
+##                        type                          description
+##                 <character>                          <character>
+## baseMean       intermediate          the base mean over all rows
+## log2FoldChange      results log2 fold change (MAP): grp PH vs DE
+## lfcSE               results         standard error: grp PH vs DE
+## stat                results         Wald statistic: grp PH vs DE
+## pvalue              results      Wald test p-value: grp PH vs DE
+## padj                results                 BH adjusted p-values
+
+
+
+plotMA(res)
+
+
+
+plotDispEsts(dds)
+
+
+
+
+write.csv(as.data.frame(res), file="results.csv") ##输出结果
+
+
+
+
+
+####################################
+## voom
+####################################
+
+library(limma)
+v <- voom(d, mm, plot=TRUE) ##这里的d就是edgeR中的d，下面就是标准的limma流程了。
+
+vf <- lmFit(v,mm)            # 'mm' 前文定义了
+cf <- contrasts.fit(vf,con)  # 'con' 前文定义了
+cf <- eBayes(cf)
+topTable(cf)
+
+##                  logFC AveExpr      t   P.Value adj.P.Val     B
+## ENSG00000104332  4.682  5.3343  16.82 4.643e-17 1.008e-12 28.60
+## ENSG00000182798  5.049  2.3421  16.02 1.802e-16 1.781e-12 27.44
+## ENSG00000126005 -4.485  5.7958 -15.47 4.669e-16 1.781e-12 26.29
+## ENSG00000147869  7.395  1.6008  15.35 5.733e-16 1.781e-12 26.23
+## ENSG00000076356  7.788  5.7036  15.35 5.745e-16 1.781e-12 25.22
+## ENSG00000158815 11.806  1.6305  15.55 4.016e-16 1.781e-12 24.92
+## ENSG00000164292  9.515  5.0669  15.50 4.418e-16 1.781e-12 24.89
+## ENSG00000164736  9.722  0.6449  15.09 9.219e-16 2.501e-12 24.24
+## ENSG00000003056 -3.454  8.4616 -13.94 7.795e-15 1.538e-11 23.84
+## ENSG00000125798  8.925  7.0947  14.11 5.645e-15 1.361e-11 22.79
+
+
+
+##我们比较不同方法给出的头几行，差别还真是大啊。 问题来了，我们应该相信哪种方法呢？我只能说，都算一下，然后每种方法给出的结果里都挑几个跑一下qRT-PCR。有人问是不是取多种办法相同的的部分会验证率高些？我的经验，真不一定。如果data好，用哪种方法验证率都高，如果data不行，那只能看看哪种方法更合适了。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
